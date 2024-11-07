@@ -1,0 +1,78 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: deployment
+  labels:
+    test: deployment
+spec:
+  steps:
+  - name: step-00 creates and verifies nginx deployment
+    try: 
+    - apply:
+        file: 00-deployment.yaml
+    - assert:
+        file: 00-deployment.yaml
+    - assert:
+        resource:
+          (x_k8s_list($client, 'apps/v1', 'Deployment', $namespace)):
+            (length(items)): 1
+    - assert:
+        file: 00-assert-pod.yaml
+
+  - name: step-01 creates and verifies nginx service
+    try: 
+    - apply:
+        file: 01-service.yaml
+    - assert:
+        file: 01-service.yaml
+    # wait for the operator pods availability
+    - wait:
+        timeout: 1m
+        apiVersion: v1
+        kind: Pod
+        namespace: ($namespace)
+        selector: "app=nginx"
+        for:
+          condition:
+            name: Ready
+            value: 'True'
+    - script:
+        timeout: 5s
+        env:
+          - name: namespace
+            value: ($namespace)
+        content: |
+          kubectl port-forward svc/nginx-service 8091:8080 --namespace $namespace &
+          sleep 1s
+          curl http://localhost:8091
+          kill %1
+        check:
+          (contains($stdout, 'Welcome to nginx')): true
+    # - proxy:
+    #     apiVersion: v1
+    #     kind: Service
+    #     namespace: ($namespace)
+    #     name: nginx-service
+    #     port: '8080'
+    #     path: /
+    #     outputs:
+    #     - name: OUTPUT
+    #       value: ($stdout)
+    # - script: 
+    #     timeout: 5s
+    #     env: 
+    #       - name: INPUT
+    #         value: ($OUTPUT)
+    #     check:
+    #       (contains($INPUT, 'Welcome to nginx')): true
+
+  - name: step-02 verifies deployment replicas scaling
+    try:
+    - patch:
+        file: 02-patch-scale-r2.yaml
+    - assert:
+        file: 02-patch-scale-r2.yaml
+    - patch:
+        file: 02-patch-scale-r3.yaml
+    - assert:
+        file: 02-patch-scale-r3.yaml

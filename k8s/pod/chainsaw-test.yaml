@@ -1,0 +1,18 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: pod
+  labels:
+    test: pod
+spec:
+  steps:
+  - name: step-00 creates and verifies nginx pod
+    try: 
+    - apply:
+        file: 00-pod.yaml
+    - assert:
+        file: 00-pod.yaml
+    - assert:
+        resource:
+          (x_k8s_list($client, 'v1', 'Pod', $namespace)):
+            (length(items)): 1
