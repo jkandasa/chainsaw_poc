@@ -25,7 +25,7 @@ spec:
         file: 01-service.yaml
     - assert:
         file: 01-service.yaml
-    # wait for the operator pods availability
+    # wait for the nginx pods availability
     - wait:
         timeout: 1m
         apiVersion: v1

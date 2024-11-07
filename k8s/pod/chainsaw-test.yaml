@@ -12,7 +12,30 @@ spec:
         file: 00-pod.yaml
     - assert:
         file: 00-pod.yaml
+    # wait for the pod availability
+    - wait:
+        timeout: 1m
+        apiVersion: v1
+        kind: Pod
+        namespace: ($namespace)
+        selector: "app=nginx"
+        for:
+          condition:
+            name: Ready
+            value: 'True'
     - assert:
         resource:
           (x_k8s_list($client, 'v1', 'Pod', $namespace)):
             (length(items)): 1
+    - script:
+        timeout: 5s
+        env:
+          - name: namespace
+            value: ($namespace)
+        content: |
+          kubectl port-forward pod/nginx-pod 8092:80 --namespace $namespace &
+          sleep 1s
+          curl http://localhost:8092
+          kill %1
+        check:
+          (contains($stdout, 'Welcome to nginx')): true
